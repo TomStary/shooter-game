@@ -1,6 +1,6 @@
 """
-Author: Jakub Drahoš
-E-mail: drahoja9@fit.cvut.cz
+Author: Tomas Stary
+E-mail: staryto5@fit.cvut.cz
 """
 
 
@@ -8,9 +8,9 @@ import sys
 import os
 
 from PyQt5 import uic
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPaintEvent, QKeyEvent, QPixmap, QPainter
-from PyQt5.QtWidgets import QMainWindow, QScrollArea, QWidget
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
 from PyQt5.QtWidgets import QApplication
 
 
@@ -49,6 +49,15 @@ class PrintableObject:
 class Bird(PrintableObject):
     def __init__(self, w, h, x, y):
         super(Bird, self).__init__(w, h, x, y, "missile.png")
+        self._fired = False
+
+    @property
+    def fired(self):
+        return self._fired
+
+    @fired.setter
+    def fired(self, val):
+        self._fired = val
 
 
 class Cannon(PrintableObject):
@@ -62,28 +71,44 @@ class Printer:
 
     def print_object(self, object: PrintableObject):
         painter = QPainter(self._canvas)
-        painter.drawPixmap(object.x, object.y, object.w, object.h, object.pic, tag="test")
+        painter.drawPixmap(object.x, object.y, object.w, object.h, object.pic)
 
 
 class Controller:
     def __init__(self):
         self.canvas = Canvas(self)
         self.printer = Printer(self.canvas)
-        self.bird = Bird(30, 29, 0, 0)
+        self.projectiles = []
+        for i in range(0,10):
+            self.projectiles.append(Bird(30, 29, 0, 0))
         self.cannon = Cannon(25, 69, 0, 0)
+        self.timer = QTimer()
+        self.timer.setInterval(5)
+        self.timer.timeout.connect(self.animation)
 
     def print_bird(self):
         self.printer.print_object(self.cannon)
-        self.printer.print_object(self.bird)
+        for projectile in self.projectiles:
+            self.printer.print_object(projectile)
 
     def move_cannon(self, offset_x: int, offset_y: int):
         self.cannon.x += offset_x
-        self.bird.x += offset_x
         self.cannon.y += offset_y
-        self.bird.y += offset_y
         self.canvas.update()
 
     def shoot(self):
+        print("fire")
+        for projectile in self.projectiles:
+            if not projectile.fired:
+                projectile.fired = True
+                break;
+        if not self.timer.isActive():
+            self.timer.start()
+
+    def animation(self):
+        for projectile in self.projectiles:
+           if projectile.fired:
+            projectile.x += 1
         self.canvas.update()
 
 
