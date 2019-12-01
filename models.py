@@ -1,6 +1,35 @@
+import sys
+import os
+
 from PyQt5.QtGui import QPixmap
 
-from run import APP_ROOT
+APP_ROOT = os.path.abspath(os.path.join(__file__, '..'))
+
+
+class Observer:
+    def update(self):
+        raise NotImplementedError
+
+
+class Observable:
+    def __init__(self):
+        self._observers = []
+
+    def registerObserver(self, observer: Observer):
+        self._observers.append(observer)
+
+    def unregisterObserver(self, observer: Observer):
+        self._observers.remove(observer)
+
+    def notifyMyObservers(self):
+        for observer in self._observers:
+            observer.update()
+
+
+class GameModel(Observable):
+    def __init__(self):
+        self._base = BaseInfo(1, 0, 1, 0)
+
 
 class ProxyGameModel():
     def __init__(self, gameModel:GameModel):
@@ -11,12 +40,7 @@ class ProxyGameModel():
         self.model.angle(angle)
         self.model.gravity(gravity)
         self.model.score(score)
-        self.model.force(force)\
-
-
-class GameModel:
-    def __init__(self):
-        self._base = BaseInfo(1, 0, 1, 0)
+        self.model.force(force)
 
 
 class BaseInfo:
@@ -84,7 +108,7 @@ class Visitable:
     def acceptVisitor(self, visitor): #TODO: doplnit omezeni na tridu
         self.visitors.append(visitor)
 
-class PrintableObject(Visitor):
+class PrintableObject():
     def __init__(self, w, h, x, y, pic):
         self.w = w
         self.h = h
