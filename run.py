@@ -13,6 +13,8 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtWidgets import QApplication
 
+from models import GameModel, ProxyGameModel
+
 
 APP_ROOT = os.path.abspath(os.path.join(__file__, '..'))
 qt_creator_file = f'{APP_ROOT}/ui/mainWindow.ui'
@@ -37,32 +39,45 @@ class Canvas(QWidget):
             self._controller.shoot();
 
 
-class PrintableObject:
+class Position:
+    def __init__(self, x = 0, y = 0):
+        self._x = x
+        self._y = y
+
+    @property
+    def x(self):
+        return self._x
+
+    @property
+    def y(self):
+        return self._y
+
+    def move(self, offset_x, offset_y):
+        self._x += offset_x
+        self._y += offset_y
+
+class PrintableObject():
     def __init__(self, w, h, x, y, pic):
         self.w = w
         self.h = h
-        self.x = x
-        self.y = y
+        self._position = Position(x, y)
         self.pic = QPixmap(f'{APP_ROOT}/ui/assets/{pic}')
+
+    def getPosition(self):
+        return self._position
+
+    def move(self, offset_x, offset_y):
+        self._position.move(offset_x, offset_y)
 
 
 class Bird(PrintableObject):
-    def __init__(self, w, h, x, y):
-        super(Bird, self).__init__(w, h, x, y, "missile.png")
-        self._fired = False
-
-    @property
-    def fired(self):
-        return self._fired
-
-    @fired.setter
-    def fired(self, val):
-        self._fired = val
+    def __init__(self, x, y):
+        super(Bird, self).__init__(30, 29, x, y, "missile.png")
 
 
 class Cannon(PrintableObject):
-    def __init__(self, w, h, x, y):
-        super(Cannon, self).__init__(w, h, x, y, "cannon.png")
+    def __init__(self, x, y):
+        super(Cannon, self).__init__(25, 69, x, y, "cannon.png")
 
 
 class Printer:
@@ -75,13 +90,12 @@ class Printer:
 
 
 class Controller:
-    def __init__(self):
+    def __init__(self, gameModel:GameModel):
+        self.gameModel = ProxyGameModel(gameModel)
         self.canvas = Canvas(self)
         self.printer = Printer(self.canvas)
         self.projectiles = []
-        for i in range(0,10):
-            self.projectiles.append(Bird(30, 29, 0, 0))
-        self.cannon = Cannon(25, 69, 0, 0)
+        self.cannon = Cannon(0, 0)
         self.timer = QTimer()
         self.timer.setInterval(5)
         self.timer.timeout.connect(self.animation)
@@ -97,20 +111,16 @@ class Controller:
         self.canvas.update()
 
     def shoot(self):
-        print("fire")
-        for projectile in self.projectiles:
-            if not projectile.fired:
-                projectile.fired = True
-                break;
+        self.projectiles.append(Bird(self.cannon.x, self.cannon.y))
+        self.canvas.update()
         if not self.timer.isActive():
             self.timer.start()
 
     def animation(self):
         for projectile in self.projectiles:
-           if projectile.fired:
             projectile.x += 1
+            projectile.y += 1
         self.canvas.update()
-
 
 class AppWindow(QMainWindow, UiMainWindow):
     def __init__(self):
@@ -118,11 +128,17 @@ class AppWindow(QMainWindow, UiMainWindow):
         UiMainWindow.__init__(self)
         self.setupUi(self)
 
-        controller = Controller()
+        gameModel = GameModel()
+        controller = Controller(gameModel)
 
         canvas_holder = self.findChild(QScrollArea, 'canvasHolder')
         canvas_holder.setWidget(controller.canvas)
         canvas_holder.setStyleSheet('background-color: white')
+
+
+class ShooterGame:
+    def __init__(self):
+        self.app = QApplication(sys.argv)
 
 
 if __name__ == '__main__':
