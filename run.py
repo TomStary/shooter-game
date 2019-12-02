@@ -40,7 +40,15 @@ class Canvas(QWidget):
 
 class Controller:
     def __init__(self, gameModel:GameModel):
-        self.gameModel = ProxyGameModel(gameModel)
+        self.gameModel = gameModel
+
+    def handleKeyCode(self, keyCode):
+        if keyCode == Qt.Key_Up:
+            self.gameModel.cannonUp()
+        elif keyCode == Qt.Key_Down:
+            self.gameModel.cannonDown()
+        elif keyCode == Qt.Key_Space:
+            self.gameModel.shoot()
 
 
 class AppWindow(QMainWindow, UiMainWindow):

@@ -60,16 +60,30 @@ class GameModel(Observable, Visitable):
 
     def initGame(self):
         self._cannon = self._factory.createCannon(0,0)
+        self._enemies.append(self._factory.createEnemy())
         self.notifyMyObservers()
 
     def acceptVisitor(self, visitor):
-        for bird in self._birds:
-            bird.acceptVisitor(visitor)
+        self._cannon.acceptVisitor(visitor)
         for enemy in self._enemies:
             enemy.acceptVisitor(visitor)
-        self._cannon.acceptVisitor(visitor)
+        for bird in self._birds:
+            bird.acceptVisitor(visitor)
         #self._base.acceptVisitor(visitor)
 
+    def cannonUp(self):
+        self._cannon.moveUp(-5)
+        self.notifyMyObservers()
+
+    def cannonDown(self):
+        self._cannon.moveDown(5)
+        self.notifyMyObservers()
+
+    def shoot(self):
+        position = self._cannon.getPosition()
+        bird = self._factory.createBird(position)
+        self._birds.append(bird)
+        self.notifyMyObservers()
 
 
 class ProxyGameModel():
@@ -166,11 +180,12 @@ class Cannon(PrintableObject):
         self._power = power
         self._angle = angle
 
-    def moveUp(self, offset_x):
-        self.move(offset_x, 0)
+    def moveUp(self, offset_y):
+        if self._position.y > 0:
+            self.move(0, offset_y)
 
-    def moveDown(self, offset_x):
-        self.move(offset_x, 0)
+    def moveDown(self, offset_y):
+        self.move(0, offset_y)
 
     def aimUp(self, offset_angle):
         self._angle += offset_angle

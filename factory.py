@@ -1,4 +1,6 @@
-from models import Cannon
+from random import randint
+
+from models import Cannon, BasicEnemy, Position, Missile
 
 
 class AbstractGameFactory:
@@ -26,4 +28,9 @@ class GameFactoryArcade(AbstractGameFactory):
         return Cannon(x, y, self._state.angle, self._state.force)
 
     def createEnemy(self):
-        return BasicEnemy(self, x, y)
+        x = randint(100, 1000)
+        y = randint(0, 700)
+        return BasicEnemy(x, y)
+
+    def createBird(self, position: Position):
+        return Missile(position.x, position.y)
