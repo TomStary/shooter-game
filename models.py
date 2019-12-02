@@ -3,7 +3,10 @@ import os
 
 from random import random
 
+from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QPixmap
+
+import strategies
 
 APP_ROOT = os.path.abspath(os.path.join(__file__, '..'))
 
@@ -49,17 +52,34 @@ class Visitable:
 class GameModel(Observable, Visitable):
     def __init__(self):
         super().__init__()
-        self._base = BaseInfo(1, 0, 1, 0)
+        self._base = BaseInfo(1, 0, 5, 90, strategies.ballistic)
         self._birds = []
         self._enemies = []
+        self._colisions = []
         self._cannon = None
         self._factory = None
+        self._time = QTimer()
+        self._time.timeout.connect(self.tickUpdate)
+        self._time.start(15)
+
+    def tickUpdate(self):
+        for bird in self._birds.copy():
+            bird.move()
+            for enemy in self._enemies.copy():
+                result = enemy.colision(bird, self._factory)
+                if result is not None:
+                    self._colisions.append(result)
+                    self._enemies.remove(enemy)
+        for enemy in self._colisions.copy():
+            if enemy.dying():
+                self._colisions.remove(enemy)
+        self.notifyMyObservers()
 
     def setFactory(self, factory):
         self._factory = factory
 
     def initGame(self):
-        self._cannon = self._factory.createCannon(0,0)
+        self._cannon = self._factory.createCannon(0, 0, self._base.angle, self._base.force, self._base.gravity, self._base._strategy)
         self._enemies.append(self._factory.createEnemy())
         self.notifyMyObservers()
 
@@ -67,9 +87,11 @@ class GameModel(Observable, Visitable):
         self._cannon.acceptVisitor(visitor)
         for enemy in self._enemies:
             enemy.acceptVisitor(visitor)
+        for enemy in self._colisions:
+            enemy.acceptVisitor(visitor)
         for bird in self._birds:
             bird.acceptVisitor(visitor)
-        #self._base.acceptVisitor(visitor)
+        self._base.acceptVisitor(visitor)
 
     def cannonUp(self):
         self._cannon.moveUp(-5)
@@ -79,10 +101,33 @@ class GameModel(Observable, Visitable):
         self._cannon.moveDown(5)
         self.notifyMyObservers()
 
+    def angleUp(self, add):
+        self._base._angle += add
+        self._cannon.aimUp(add)
+
+    def angleDown(self, sub):
+        self._base._angle -= sub
+        self._cannon.aimDown(sub)
+
+    def forceUp(self, add):
+        self._base._force += add
+        self._cannon.forceUp(add)
+
+    def forceDown(self, sub):
+        self._base._force -= sub
+        self._cannon.forceDown(sub)
+
+    def changeStrategy(self):
+        if self._base._strategy == strategies.ballistic:
+            self._base._strategy = strategies.oblique
+        elif self._base._strategy == strategies.oblique:
+            self._base._strategy = strategies.straight
+        elif self._base._strategy == strategies.straight:
+            self._base._strategy = strategies.ballistic
+        self._cannon.setStrategy(self._base.strategy)
+
     def shoot(self):
-        position = self._cannon.getPosition()
-        bird = self._factory.createBird(position)
-        self._birds.append(bird)
+        self._birds.append(self._cannon.shoot())
         self.notifyMyObservers()
 
 
@@ -100,11 +145,12 @@ class ProxyGameModel():
 
 class BaseInfo(Visitable):
     #gamemodel should maybe have a snapshot of all enemy positions and also position of canon...
-    def __init__(self, gravity, score, force, angle):
+    def __init__(self, gravity, score, force, angle, strategy):
         self._gravity = gravity
         self._score = score
         self._force = force
         self._angle = angle
+        self._strategy = strategy
 
     @property
     def gravity(self):
@@ -136,10 +182,18 @@ class BaseInfo(Visitable):
 
     @angle.setter
     def angle(self, value):
-        self._angle = value
+        self._angle += value
+
+    @property
+    def strategy(self):
+        return self._strategy
+
+    @strategy.setter
+    def strategy(self, val):
+        self._strategy = val
 
     def acceptVisitor(self, visitor):
-        pass
+        visitor.visitGameInfo(self)
 
 
 class Position:
@@ -175,10 +229,13 @@ class PrintableObject(Visitable):
 
 
 class Cannon(PrintableObject):
-    def __init__(self, x = 0, y = 0, power = 1, angle = 0):
+    def __init__(self, x = 0, y = 0, angle = 0, force = 1, gravity = 0, strategy = None, factory = None):
         super().__init__(25, 69, x, y, "cannon.png")
-        self._power = power
+        self._force = force
         self._angle = angle
+        self._gravity = gravity
+        self._factory = factory
+        self._strategy = strategy
 
     def moveUp(self, offset_y):
         if self._position.y > 0:
@@ -193,8 +250,17 @@ class Cannon(PrintableObject):
     def aimDown(self, offset_angle):
         self._angle -= offset_angle
 
+    def forceUp(self, add):
+        self._force += add
+
+    def forceDown(self, sub):
+        self._force -= sub
+
+    def setStrategy(self, strategy):
+        self._strategy = strategy
+
     def shoot(self):
-        raise NotImplementedError
+        return self._factory.createBird(self._position, self._angle, self._force, self._gravity, self._strategy)
 
     def acceptVisitor(self, visitor):
         visitor.visitCannon(self)
@@ -209,13 +275,46 @@ class AbstractMissile(PrintableObject):
 
 
 class Missile(AbstractMissile):
-    def __init__(self, x, y):
+    def __init__(self, x, y, angle, force, gravity, strategy):
         super().__init__(x, y)
+        self._force = force
+        self._angle = angle
+        self._gravity = gravity
+        self._strategy = strategy
+        self._distance = 0
 
+    def move(self):
+        self._distance += 1
+        x, y = self._strategy(self._angle, self._force, self._gravity, self._distance)
+        self._position.move(x, y)
+
+
+class DeadEnemy(PrintableObject):
+    def __init__(self, x, y):
+        super().__init__(30, 29, x, y, "collision.png")
+        self.duration = 50
+
+    def acceptVisitor(self, visitor):
+        visitor.visitCollision(self)
+
+    def dying(self):
+        self.duration -= 1
+        if self.duration > 0:
+            return False
+        else:
+            return True
 
 class AbstractEnemy(PrintableObject):
     def __init__(self, x, y):
         super().__init__(30, 29, x, y, "enemy1.png")
+
+    def colision(self, bird, factory):
+        bird_pos = bird.getPosition()
+        pig_pos = self.getPosition()
+        if (abs(bird_pos.x - pig_pos.x) <= 30) and (abs(bird_pos.y - pig_pos.y) <= 29):
+            return factory.createColision(pig_pos)
+        else:
+            return None
 
     def acceptVisitor(self, visitor):
         visitor.visitEnemy(self)
@@ -224,6 +323,9 @@ class AbstractEnemy(PrintableObject):
 class BasicEnemy(AbstractEnemy):
     def __init__(self, x, y):
         super().__init__(x, y)
+
+    def move(self):
+        pass
 
 
 class MovingEnemy(AbstractEnemy):

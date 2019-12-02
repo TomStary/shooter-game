@@ -49,6 +49,16 @@ class Controller:
             self.gameModel.cannonDown()
         elif keyCode == Qt.Key_Space:
             self.gameModel.shoot()
+        elif keyCode == Qt.Key_W:
+            self.gameModel.angleUp(2)
+        elif keyCode == Qt.Key_S:
+            self.gameModel.angleDown(2)
+        elif keyCode == Qt.Key_R:
+            self.gameModel.forceUp(1)
+        elif keyCode == Qt.Key_F:
+            self.gameModel.forceDown(1)
+        elif keyCode == Qt.Key_G:
+            self.gameModel.changeStrategy()
 
 
 class AppWindow(QMainWindow, UiMainWindow):
@@ -113,9 +123,11 @@ class GameRenderer(Visitor):
     def visitEnemy(self, enemy):
         self.draw(enemy)
 
+    def visitCollision(self, enemy):
+        self.draw(enemy)
+
     def visitGameInfo(self, info: BaseInfo):
         self.setAngle(info.angle)
-        self.setForce(info.force)
         self.setForce(info.force)
         self.setGravity(info.gravity)
         self.setScore(info.score)
