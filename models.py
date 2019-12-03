@@ -7,6 +7,8 @@ from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QPixmap
 
 import strategies
+from commands import Command
+from config import config
 
 APP_ROOT = os.path.abspath(os.path.join(__file__, '..'))
 
@@ -52,10 +54,11 @@ class Visitable:
 class GameModel(Observable, Visitable):
     def __init__(self):
         super().__init__()
-        self._base = BaseInfo(1, 0, 5, 90, strategies.ballistic)
+        self._base = BaseInfo(1, 0, 5, 0, strategies.ballistic)
         self._birds = []
         self._enemies = []
         self._colisions = []
+        self._commands = []
         self._cannon = None
         self._factory = None
         self._time = QTimer()
@@ -63,12 +66,18 @@ class GameModel(Observable, Visitable):
         self._time.start(15)
 
     def tickUpdate(self):
+        for command in self._commands.copy():
+            command.execute()
+            self._commands.remove(command)
+
         for bird in self._birds.copy():
             bird.move()
             for enemy in self._enemies.copy():
+                enemy.move()
                 result = enemy.colision(bird, self._factory)
                 if result is not None:
                     self._colisions.append(result)
+                    self.scoreUp()
                     self._enemies.remove(enemy)
         for enemy in self._colisions.copy():
             if enemy.dying():
@@ -93,6 +102,9 @@ class GameModel(Observable, Visitable):
             bird.acceptVisitor(visitor)
         self._base.acceptVisitor(visitor)
 
+    def acceptCommand(self, command: Command):
+        self._commands.append(command)
+
     def cannonUp(self):
         self._cannon.moveUp(-5)
         self.notifyMyObservers()
@@ -116,6 +128,12 @@ class GameModel(Observable, Visitable):
     def forceDown(self, sub):
         self._base._force -= sub
         self._cannon.forceDown(sub)
+
+    def scoreUp(self):
+        self._base._score += 1
+
+    def spawnEnemy(self):
+        self._enemies.append(self._factory.createEnemy())
 
     def changeStrategy(self):
         if self._base._strategy == strategies.ballistic:
@@ -331,7 +349,25 @@ class BasicEnemy(AbstractEnemy):
 class MovingEnemy(AbstractEnemy):
     def __init__(self, x, y):
         super().__init__(x, y)
+        self._vx = random() * 37 % 5
+        self._vy = random() * 37 % 5
+
+        a = int(random() * 20) % 2
+        b = int(random() * 20) % 2
+
+        if a == 0:
+            self._vx *= -1
+        if b == 0:
+            self._vy *= -1
+
 
     def move(self):
-        self._x += 1
-        self._y += 1
+        pos = self.getPosition()
+        if pos._x + self._vx <= 0 or pos._x + self._vx + self.w  >= config.width:
+            self._vx *= -1
+        if pos._y + self._vy <= 0 or pos._y + self._vy + self.h  >= config.height:
+            self._vy *= -1
+
+        pos._x += self._vx
+        pos._y += self._vy
+

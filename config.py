@@ -5,6 +5,6 @@ class Config:
         self.width = 1021
         self.height = 741
         self.doubleShoot = False
-        self.simpleGame = False
+        self.arcade = False
 
 config = Config()

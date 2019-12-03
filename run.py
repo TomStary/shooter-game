@@ -14,8 +14,10 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtWidgets import QApplication
 
 from models import GameModel, ProxyGameModel, Observer, Visitor, BaseInfo
-from factory import GameFactoryArcade
+from factory import GameFactoryArcade, GameFactoryRealistic
 from state import State
+import commands
+from config import config
 
 
 APP_ROOT = os.path.abspath(os.path.join(__file__, '..'))
@@ -44,21 +46,23 @@ class Controller:
 
     def handleKeyCode(self, keyCode):
         if keyCode == Qt.Key_Up:
-            self.gameModel.cannonUp()
+            self.gameModel.acceptCommand(commands.CannonUpCommand(self.gameModel))
         elif keyCode == Qt.Key_Down:
-            self.gameModel.cannonDown()
+            self.gameModel.acceptCommand(commands.CannonDownCommand(self.gameModel))
         elif keyCode == Qt.Key_Space:
-            self.gameModel.shoot()
+            self.gameModel.acceptCommand(commands.ShootCommand(self.gameModel))
         elif keyCode == Qt.Key_W:
-            self.gameModel.angleUp(2)
+            self.gameModel.acceptCommand(commands.AngleUpCommand(self.gameModel))
         elif keyCode == Qt.Key_S:
-            self.gameModel.angleDown(2)
+            self.gameModel.acceptCommand(commands.AngleDownCommand(self.gameModel))
         elif keyCode == Qt.Key_R:
-            self.gameModel.forceUp(1)
+            self.gameModel.acceptCommand(commands.ForceUpCommand(self.gameModel))
         elif keyCode == Qt.Key_F:
-            self.gameModel.forceDown(1)
+            self.gameModel.acceptCommand(commands.ForceDownCommand(self.gameModel))
         elif keyCode == Qt.Key_G:
-            self.gameModel.changeStrategy()
+            self.gameModel.acceptCommand(commands.ChangeStrategyCommand(self.gameModel))
+        elif keyCode == Qt.Key_P:
+            self.gameModel.acceptCommand(commands.SpawnEnemyCommand(self.gameModel))
 
 
 class AppWindow(QMainWindow, UiMainWindow):
@@ -85,6 +89,21 @@ class GameView(Observer):
         self.renderer.update()
 
 
+class Printer:
+    def draw(self, object):
+        pass
+
+
+class QtPrinter(Printer):
+    def __init__(self, canvas):
+        self._canvas = canvas
+    def draw(self, entity):
+        painter = QPainter(self._canvas)
+        #this might need some tinkering
+        position = entity.getPosition()
+        painter.drawPixmap(position.x, position.y, entity.w, entity.h, entity.pic)
+
+
 class GameRenderer(Visitor):
     def __init__(self, platform):
         self._forceLabel = platform.findChild(QLabel, 'forceLabel')
@@ -92,12 +111,10 @@ class GameRenderer(Visitor):
         self._gravityLabel = platform.findChild(QLabel, 'gravityLabel')
         self._scoreLabel = platform.findChild(QLabel, 'scoreLabel')
         self._canvas = platform.canvas
+        self._printer = QtPrinter(self._canvas)
 
     def draw(self, entity):
-        painter = QPainter(self._canvas)
-        #this might need some tinkering
-        position = entity.getPosition()
-        painter.drawPixmap(position.x, position.y, entity.w, entity.h, entity.pic)
+       self._printer.draw(entity)
 
     def update(self):
         self._canvas.update()
@@ -141,7 +158,10 @@ class ShooterGame:
         self.controller = Controller(self.gameModel)
         self.view = GameView(self.controller, self.gameModel)
         self.gameModel.registerObserver(self.view)
-        factory = GameFactoryArcade(self.state)
+        if config.arcade:
+            factory = GameFactoryArcade(self.state)
+        else:
+            factory = GameFactoryRealistic(self.state)
         self.gameModel.setFactory(factory)
         self.gameModel.initGame()
 
