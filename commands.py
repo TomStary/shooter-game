@@ -1,3 +1,9 @@
+"""
+Author: Tomas Stary
+E-mail: staryto5@fit.cvut.cz
+"""
+
+
 class Command:
     def __init__(self, model):
         self._model = model
@@ -54,3 +60,18 @@ class ChangeStrategyCommand(Command):
 class SpawnEnemyCommand(Command):
     def execute(self):
         self._model.spawnEnemy()
+
+
+class SaveCommand(Command):
+    def execute(self):
+        self._model.save()
+
+
+class LoadCommand(Command):
+    def execute(self):
+        self._model.load()
+
+
+class ChangeModeCommand(Command):
+    def execute(self):
+        self._model.changeMode()

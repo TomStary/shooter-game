@@ -1,7 +1,14 @@
+"""
+Author: Tomas Stary
+E-mail: staryto5@fit.cvut.cz
+"""
+
+
 import sys
 import os
 
 from random import random
+from copy import copy
 
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QPixmap
@@ -11,6 +18,28 @@ from commands import Command
 from config import config
 
 APP_ROOT = os.path.abspath(os.path.join(__file__, '..'))
+
+
+class FireMode():
+    def __init__(self, gameModel):
+        self.gameModel = gameModel
+
+    def fire(self):
+        raise NotImplementedError
+
+
+class SingleShotFireMode(FireMode):
+    def fire(self):
+        return self.gameModel._cannon.shoot()
+
+class DoubleShotFireMode(FireMode):
+    def fire(self):
+        birds = []
+        self.gameModel._base._angle -= 10
+        birds.append(self.gameModel._cannon.shoot())
+        self.gameModel._base._angle += 10
+        birds.append(self.gameModel._cannon.shoot())
+        return birds
 
 
 class Observer:
@@ -51,6 +80,23 @@ class Visitable:
         raise NotImplementedError
 
 
+class ProxyGameInfo():
+    def __init__(self, gameInfo):
+        self.model = gameInfo
+
+    def getAngle(self):
+        return self.model.angle
+
+    def getForce(self):
+        return self.model.force
+
+    def getGravity(self):
+        return self.model.gravity
+
+    def getStrategy(self):
+        return self.model.strategy
+
+
 class GameModel(Observable, Visitable):
     def __init__(self):
         super().__init__()
@@ -64,6 +110,8 @@ class GameModel(Observable, Visitable):
         self._time = QTimer()
         self._time.timeout.connect(self.tickUpdate)
         self._time.start(15)
+        self._prevState = []
+        self._mode = SingleShotFireMode(self)
 
     def tickUpdate(self):
         for command in self._commands.copy():
@@ -84,11 +132,16 @@ class GameModel(Observable, Visitable):
                 self._colisions.remove(enemy)
         self.notifyMyObservers()
 
-    def setFactory(self, factory):
+    def setFactory(self):
+        from factory import GameFactoryArcade, GameFactoryRealistic
+        if config.arcade:
+            factory = GameFactoryArcade(ProxyGameInfo(self._base))
+        else:
+            factory = GameFactoryRealistic(ProxyGameInfo(self._base))
         self._factory = factory
 
     def initGame(self):
-        self._cannon = self._factory.createCannon(0, 0, self._base.angle, self._base.force, self._base.gravity, self._base._strategy)
+        self._cannon = self._factory.createCannon(0, 0)
         self._enemies.append(self._factory.createEnemy())
         self.notifyMyObservers()
 
@@ -145,21 +198,35 @@ class GameModel(Observable, Visitable):
         self._cannon.setStrategy(self._base.strategy)
 
     def shoot(self):
-        self._birds.append(self._cannon.shoot())
+        result = self._mode.fire()
+        if isinstance(result, list):
+            for bird in result:
+                self._birds.append(bird)
+        else:
+            self._birds.append(result)
         self.notifyMyObservers()
 
+    def save(self):
+        import memento
+        enemies = []
+        for enemy in self._enemies.copy():
+            enemies.append(copy(enemy))
+        self._prevState.append(memento.SaveInfoObject(copy(self._cannon), copy(self._base), enemies))
 
-class ProxyGameModel():
-    def __init__(self, gameModel:GameModel):
-        self.model = gameModel
+    def load(self):
+        if len(self._prevState) == 0:
+            return
+        prev_state = self._prevState.pop()
+        self._cannon = prev_state._cannon
+        self._base = prev_state._base
+        self._enemies = prev_state._enemies
+        self.notifyMyObservers()
 
-    def changeModel(self, gravity, score, force, angle):
-        #here can be implemented memento for going back and forth with game model - reseting score, undo...
-        self.model.angle(angle)
-        self.model.gravity(gravity)
-        self.model.score(score)
-        self.model.force(force)
-
+    def changeMode(self):
+        if isinstance(self._mode, SingleShotFireMode):
+            self._mode = DoubleShotFireMode(self)
+        else:
+            self._mode = SingleShotFireMode(self)
 
 class BaseInfo(Visitable):
     #gamemodel should maybe have a snapshot of all enemy positions and also position of canon...
@@ -255,6 +322,9 @@ class Cannon(PrintableObject):
         self._factory = factory
         self._strategy = strategy
 
+    def __copy__(self):
+        return Cannon(self._position.x, self._position.y, self._force, self._angle, self._gravity, self._factory, self._strategy)
+
     def moveUp(self, offset_y):
         if self._position.y > 0:
             self.move(0, offset_y)
@@ -278,7 +348,7 @@ class Cannon(PrintableObject):
         self._strategy = strategy
 
     def shoot(self):
-        return self._factory.createBird(self._position, self._angle, self._force, self._gravity, self._strategy)
+        return self._factory.createBird(self._position)
 
     def acceptVisitor(self, visitor):
         visitor.visitCannon(self)
@@ -303,7 +373,7 @@ class Missile(AbstractMissile):
 
     def move(self):
         self._distance += 1
-        x, y = self._strategy(self._angle, self._force, self._gravity, self._distance)
+        x, y = self._strategy(self._force, self._angle, self._gravity, self._distance)
         self._position.move(x, y)
 
 

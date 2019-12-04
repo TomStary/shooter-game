@@ -13,7 +13,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtWidgets import QApplication
 
-from models import GameModel, ProxyGameModel, Observer, Visitor, BaseInfo
+from models import GameModel, Observer, Visitor, BaseInfo
 from factory import GameFactoryArcade, GameFactoryRealistic
 from state import State
 import commands
@@ -63,6 +63,12 @@ class Controller:
             self.gameModel.acceptCommand(commands.ChangeStrategyCommand(self.gameModel))
         elif keyCode == Qt.Key_P:
             self.gameModel.acceptCommand(commands.SpawnEnemyCommand(self.gameModel))
+        elif keyCode == Qt.Key_N:
+            self.gameModel.acceptCommand(commands.SaveCommand(self.gameModel))
+        elif keyCode == Qt.Key_M:
+            self.gameModel.acceptCommand(commands.LoadCommand(self.gameModel))
+        elif keyCode == Qt.Key_O:
+            self.gameModel.acceptCommand(commands.ChangeModeCommand(self.gameModel))
 
 
 class AppWindow(QMainWindow, UiMainWindow):
@@ -158,11 +164,7 @@ class ShooterGame:
         self.controller = Controller(self.gameModel)
         self.view = GameView(self.controller, self.gameModel)
         self.gameModel.registerObserver(self.view)
-        if config.arcade:
-            factory = GameFactoryArcade(self.state)
-        else:
-            factory = GameFactoryRealistic(self.state)
-        self.gameModel.setFactory(factory)
+        self.gameModel.setFactory()
         self.gameModel.initGame()
 
         sys.exit(self.app.exec_())

@@ -1,11 +1,17 @@
+"""
+Author: Tomas Stary
+E-mail: staryto5@fit.cvut.cz
+"""
+
+
 from random import randint
 
 from models import Cannon, BasicEnemy, Position, Missile, DeadEnemy, MovingEnemy
 
 
 class AbstractGameFactory:
-    def __init__(self, state):
-        self._state = state
+    def __init__(self, model):
+        self._model = model
 
     def createCannon(self):
         raise NotImplementedError
@@ -21,38 +27,38 @@ class AbstractGameFactory:
 
 
 class GameFactoryArcade(AbstractGameFactory):
-    def __init__(self, state):
-        super().__init__(state)
+    def __init__(self, model):
+        super().__init__(model)
 
-    def createCannon(self, x, y, angle, force, gravity, strategy):
-        return Cannon(x, y, angle, force, gravity, strategy, self)
+    def createCannon(self, x, y):
+        return Cannon(x, y, self._model.getAngle(), self._model.getForce(), self._model.getGravity(), self._model.getStrategy(), self)
 
     def createEnemy(self):
         x = randint(100, 1000)
         y = randint(0, 700)
         return BasicEnemy(x, y)
 
-    def createBird(self, position: Position, angle, force, gravity, strategy):
-        return Missile(position.x, position.y, force, angle, gravity, strategy)
+    def createBird(self, position: Position):
+        return Missile(position.x, position.y, self._model.getAngle(), self._model.getForce(), self._model.getGravity(), self._model.getStrategy())
 
     def createColision(self, position: Position):
         return DeadEnemy(position.x, position.y)
 
 
 class GameFactoryRealistic(AbstractGameFactory):
-    def __init__(self, state):
-        super().__init__(state)
+    def __init__(self, model):
+        super().__init__(model)
 
-    def createCannon(self, x, y, angle, force, gravity, strategy):
-        return Cannon(x, y, angle, force, gravity, strategy, self)
+    def createCannon(self, x, y):
+        return Cannon(x, y, self._model.getAngle(), self._model.getForce(), self._model.getGravity(), self._model.getStrategy(), self)
 
     def createEnemy(self):
         x = randint(100, 1000)
         y = randint(0, 700)
         return MovingEnemy(x, y)
 
-    def createBird(self, position: Position, angle, force, gravity, strategy):
-        return Missile(position.x, position.y, force, angle, gravity, strategy)
+    def createBird(self, position: Position):
+        return Missile(position.x, position.y, self._model.getAngle(), self._model.getForce(), self._model.getGravity(), self._model.getStrategy())
 
     def createColision(self, position: Position):
         return DeadEnemy(position.x, position.y)
